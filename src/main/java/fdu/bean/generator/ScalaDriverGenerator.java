@@ -3,9 +3,6 @@ package fdu.bean.generator;
 import fdu.service.operation.operators.*;
 
 import java.io.IOException;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Created by zhou on 2017/7/1.
@@ -19,18 +16,15 @@ public class ScalaDriverGenerator implements OperatorVisitor {
     		+ "import org.apache.spark.streaming._ \n"
     		+ "import org.apache.spark.streaming.kafka._ \n"
 			+ "import org.apache.spark.storage.StorageLevel \n"
-//    	    + "@transient val ssc = new StreamingContext(sc, Seconds(1)) \n";
+            + "import java.util.concurrent.atomic.LongAdder \n"
+            + "import org.apache.spark.sql.hive.HiveContext \n"
+            + "import spark.implicits._\n"
 			+ "@transient val ssc = new StreamingContext(sc, Seconds(2)) \n";
 
 	@Override
     public void visitDataSource(DataSource source) {
-
-    	scalaProgram += "val zkQuorum = \"122.144.216.246:2181,122.144.216.237:2181,122.144.216.250:2181\"\n"
-    			+ "val group = \"test\"\n"
-    			+ "val topics = \"test-topic\"\n"
-    			+ "val topicMap = topics.split(\",\").map((_, 1)).toMap \n"
-//    			+ "val lines = KafkaUtils.createStream(ssc, zkQuorum, group, topicMap).map(_._2) \n";
-				+ "val lines = ssc.socketTextStream(\"localhost\", 9998) \n";
+    	scalaProgram += "val lines = ssc.socketTextStream(\"localhost\", 9998)\n";
+    	scalaProgram += "var urlHitsMap:Map[String, LongAdder] = Map()\n";
 		try {
 			if (source.getName().equals("xc")) {
 //				Runtime.getRuntime().exec("java -jar inputdata.jar");
@@ -53,16 +47,34 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 
 	@Override
 	public void visitWordCount(WordCount wordCount) {
-//		// TODO Auto-generated method stub
-		scalaProgram += "val words = lines.flatMap(_.split(\" \")) \n"
+//		scalaProgram += "val words = lines.flatMap(_.split(\" \")) \n"
 ////				+ "val result = words.map(x => (x, 1L)).reduceByKeyAndWindow(_ + _, _ - _, Seconds(10), Seconds(5)) \n";
 ////				+ "val result = words.map(x => (x, 1L)).reduceByKeyAndWindow(_ + _, _ - _, Seconds(20), Seconds(10)) \n";
-				+ "val result = words.map(x => (x, 1L)) \n";
+//				+ "val result = words.map(x => (x, 1L)) \n";
+		scalaProgram += "val tuple = lines.map(x => x.split(\" \"))\n";
+		scalaProgram += "tuple.foreachRDD(rdd => { val urls = rdd.map(x => x(2)).collect()\n" +
+                "   for (url <- urls) {\n" +
+                "       if (!urlHitsMap.contains(url)) {\n" +
+                "           urlHitsMap += (url -> new LongAdder())\n" +
+                "       }\n" +
+                "       urlHitsMap.get(url).get.increment" +
+                "   }\n" +
+                "})\n";
+		scalaProgram += "val tid = System.currentTimeMillis() / 1000 * 1000\n";
+		scalaProgram += "var array = new Array[(String, LongAdder)](urlHitsMap.size)\n";
+		scalaProgram += "urlHitsMap.copyToArray(array)\n";
+		scalaProgram += "val df = sc.parallelize(array.map(x => (tid, x._1, x._2.intValue)))" +
+                ".toDF(\"tid\", \"url\", \"count\")\n";
+        scalaProgram += "val sqlContext = new HiveContext(sc)\n";
+        scalaProgram += "sqlContext.sql(\"DROP TABLE IF EXISTS sparktest.groupby\")\n";
+        scalaProgram += "sqlContext.sql(\"CREATE TABLE IF NOT EXISTS " +
+                "sparktest.groupby (`tid` bigint, `url` varchar(100), `count` int)\")\n";
+		scalaProgram += "df.write.insertInto(\"sparktest.groupby\")\n";
 
 //		scalaProgram += "val result = lines.map(x => (x, 1L)) \n";
 
 //		scalaProgram += "result.print()\n";
-		
+
 //		val mappingFunc = (word: String, one: Option[Int], state: State[Int]) => {
 //		      val sum = one.getOrElse(0) + state.getOption.getOrElse(0)
 //		      val output = (word, sum)
@@ -71,7 +83,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 //		    }
 //		val stateDstream = words.map(x => (x, 1L)).mapWithState(
 //			      StateSpec.function(mappingFunc).initialState(initialRDD))
-		
+
 //		val wordCounts.foreachRDD( rdd => {
 //			import org.apache.spark.sql.hive.HiveContext
 //			val sqlContext = new HiveContext(sc)
@@ -79,8 +91,8 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 //			val df = rdd.map(x => (x._1,x._2,System.currentTimeMillis())).toDF("word", "count", "time")
 //		    df.write.saveAsTable("table_name") }
 //		)
-		
-		
+
+
 //		import java.util.{Date, Properties}
 //		val props = new Properties()
 //		props.put("bootstrap.servers", "10.141.208.49:9092,10.141.208.47:9092,10.141.208.45:9092")
@@ -98,13 +110,23 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 	
 	@Override
 	public void visitWindowAggregation(WindowAggregation windowAggregation) {
-		// TODO Auto-generated method stub
-		scalaProgram += "val numbers = lines.map(_.toDouble) \n"
-				+ "val numbersAndCount = numbers.map((_, 1 , Double.MinValue, Double.MaxValue)) \n"
-				+ "val aggregation = numbersAndCount.reduceByWindow({(t1, t2) => (t1._1 + t2._1, t1._2 + t2._2, t1._1 max t2._1 max t1._3 max t2._3, t1._1 min t2._1 min t1._4 min t2._4)}, Seconds(2), Seconds(2)) \n";
+//		scalaProgram += "val numbers = lines.map(_.toDouble) \n"
+//				+ "val numbersAndCount = numbers.map((_, 1 , Double.MinValue, Double.MaxValue)) \n"
+//				+ "val aggregation = numbersAndCount.reduceByWindow({(t1, t2) => (t1._1 + t2._1, t1._2 + t2._2, t1._1 max t2._1 max t1._3 max t2._3, t1._1 min t2._1 min t1._4 min t2._4)}, Seconds(2), Seconds(2)) \n";
 		switch (windowAggregation.getFunction()) {
-			case "sum":
-				scalaProgram += "val result = aggregation.map(_._1) \n";
+			case "sum": {
+			    scalaProgram += "val sqlContext = new HiveContext(sc)\n";
+			    scalaProgram += "sqlContext.sql(\"DROP TABLE IF EXISTS sparktest.aggregation\")\n";
+			    scalaProgram += "sqlContext.sql(\"CREATE TABLE IF NOT EXISTS sparktest.aggregation " +
+                        "(`tid` bigint, `count` int)\")\n";
+			    scalaProgram += "lines.foreachRDD( rdd => {\n" +
+                        "   val time = System.currentTimeMillis() / 2000 * 2000\n" +
+                        "   val count = rdd.count()\n" +
+                        "   val df = rdd.map(x => (time, count)).toDF(\"tid\", \"count\")\n" +
+                        "   df.limit(1).write.insertInto(\"sparktest.aggregation\")\n" +
+                        "   df.show(1)" +
+                        "}\n)\n";
+            }
 			break;
 			case "avg":
 				scalaProgram += "val result = aggregation.map(x => x._1 / x._2) \n";
@@ -137,23 +159,22 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 		} else if (output.getDest().equals("console")) {
 			scalaProgram += "result.print() \n";
 		} else if (output.getDest().equals("hive")) {
-			scalaProgram += "import org.apache.spark.sql.hive.HiveContext\n" +
-					"val sqlContext = new HiveContext(sc)\n" +
-					"import sqlContext.implicits._\n" +
-					"import scala.util.Random\n" +
-					"sqlContext.sql(\"DROP TABLE IF EXISTS sparktest.wa\")\n" +
-					"sqlContext.sql(\"create table if not exists sparktest.wa (`tid` bigint, `value` int)\")\n" +
-//					"result.map(x => (System.currentTimeMillis() / 1000, 1)).foreachRDD( rdd => {\n" +
-					"result.foreachRDD( rdd => {\n" +
-//		"val df = rdd.map(x => (x._1,System.currentTimeMillis())).toDF("agg", "time")
-//					"val df = rdd.map(x => (System.currentTimeMillis() / 1000, 1)).toDF(\"tid\", \"values\")\n" +
-//					"val df = rdd.toDF(\"tid\", \"values\")\n" +
-					"val time = System.currentTimeMillis() / 2000 * 2000\n" +
-					"val count = rdd.count()\n" +
-					"val df = rdd.map(x => (time, count)).toDF(\"tid\", \"values\")\n" +
-					"df.limit(1).write.insertInto(\"sparktest.wa\")\n" +
-					"df.show(1)" +
-					"}\n)\n";
+//			scalaProgram += "import org.apache.spark.sql.hive.HiveContext\n" +
+//					"val sqlContext = new HiveContext(sc)\n" +
+//					"import sqlContext.implicits._\n" +
+//					"sqlContext.sql(\"DROP TABLE IF EXISTS sparktest.wa\")\n" +
+//					"sqlContext.sql(\"create table if not exists sparktest.wa (`tid` bigint, `value` int)\")\n" +
+////					"result.map(x => (System.currentTimeMillis() / 1000, 1)).foreachRDD( rdd => {\n" +
+//					"result.foreachRDD( rdd => {\n" +
+////		"val df = rdd.map(x => (x._1,System.currentTimeMillis())).toDF("agg", "time")
+////					"val df = rdd.map(x => (System.currentTimeMillis() / 1000, 1)).toDF(\"tid\", \"values\")\n" +
+////					"val df = rdd.toDF(\"tid\", \"values\")\n" +
+//					"val time = System.currentTimeMillis() / 2000 * 2000\n" +
+//					"val count = rdd.count()\n" +
+//					"val df = rdd.map(x => (time, count)).toDF(\"tid\", \"values\")\n" +
+//					"df.limit(1).write.insertInto(\"sparktest.wa\")\n" +
+//					"df.show(1)" +
+//					"}\n)\n";
 //	)
 		}
 	}
@@ -162,7 +183,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
     public String generate(String id) {
         return importPackages 
 //        		+ "ssc.checkpoint(\"hdfs://" + masterIP + ":9000/user/hadoop/checkpoint_" + id + "\")\n" //checkpoint must be a hdfs dir
-				+ "ssc.checkpoint(\"hdfs://" + "10.141.208.43" + ":9000/user/hadoop/checkpoint_" + id + "\")\n" //checkpoint must be a hdfs dir
+//				+ "ssc.checkpoint(\"hdfs://" + "10.141.208.43" + ":9000/user/hadoop/checkpoint_" + id + "\")\n" //checkpoint must be a hdfs dir
         		+ scalaProgram
         		+ "ssc.start() \n";
 //        		+ "ssc.awaitTerminationOrTimeout(1000*20) \n"
