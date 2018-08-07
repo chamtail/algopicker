@@ -24,7 +24,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 	@Override
     public void visitDataSource(DataSource source) {
     	scalaProgram += "val lines = ssc.socketTextStream(\"localhost\", 9998)\n";
-    	scalaProgram += "var urlHitsMap:Map[String, LongAdder] = Map()\n";
+//    	scalaProgram += "var urlHitsMap:Map[String, LongAdder] = Map()\n";
 		try {
 			if (source.getName().equals("xc")) {
 //				Runtime.getRuntime().exec("java -jar inputdata.jar");
@@ -47,65 +47,16 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 
 	@Override
 	public void visitWordCount(WordCount wordCount) {
-//		scalaProgram += "val words = lines.flatMap(_.split(\" \")) \n"
-////				+ "val result = words.map(x => (x, 1L)).reduceByKeyAndWindow(_ + _, _ - _, Seconds(10), Seconds(5)) \n";
-////				+ "val result = words.map(x => (x, 1L)).reduceByKeyAndWindow(_ + _, _ - _, Seconds(20), Seconds(10)) \n";
-//				+ "val result = words.map(x => (x, 1L)) \n";
 		scalaProgram += "val tuple = lines.map(x => x.split(\" \"))\n";
-		scalaProgram += "tuple.foreachRDD(rdd => { val urls = rdd.map(x => x(2)).collect()\n" +
-                "   for (url <- urls) {\n" +
-                "       if (!urlHitsMap.contains(url)) {\n" +
-                "           urlHitsMap += (url -> new LongAdder())\n" +
-                "       }\n" +
-                "       urlHitsMap.get(url).get.increment" +
-                "   }\n" +
-                "})\n";
-		scalaProgram += "val tid = System.currentTimeMillis() / 1000 * 1000\n";
-		scalaProgram += "var array = new Array[(String, LongAdder)](urlHitsMap.size)\n";
-		scalaProgram += "urlHitsMap.copyToArray(array)\n";
-		scalaProgram += "val df = sc.parallelize(array.map(x => (tid, x._1, x._2.intValue)))" +
-                ".toDF(\"tid\", \"url\", \"count\")\n";
+		scalaProgram += "val result = tuple.map(x => (x(2), 1L)).reduceByKeyAndWindow(_ + _, _ - _, Seconds(4), Seconds(2))\n";
         scalaProgram += "val sqlContext = new HiveContext(sc)\n";
         scalaProgram += "sqlContext.sql(\"DROP TABLE IF EXISTS sparktest.groupby\")\n";
-        scalaProgram += "sqlContext.sql(\"CREATE TABLE IF NOT EXISTS " +
-                "sparktest.groupby (`tid` bigint, `url` varchar(100), `count` int)\")\n";
-		scalaProgram += "df.write.insertInto(\"sparktest.groupby\")\n";
-
-//		scalaProgram += "val result = lines.map(x => (x, 1L)) \n";
-
-//		scalaProgram += "result.print()\n";
-
-//		val mappingFunc = (word: String, one: Option[Int], state: State[Int]) => {
-//		      val sum = one.getOrElse(0) + state.getOption.getOrElse(0)
-//		      val output = (word, sum)
-//		      state.update(sum)
-//		      output
-//		    }
-//		val stateDstream = words.map(x => (x, 1L)).mapWithState(
-//			      StateSpec.function(mappingFunc).initialState(initialRDD))
-
-//		val wordCounts.foreachRDD( rdd => {
-//			import org.apache.spark.sql.hive.HiveContext
-//			val sqlContext = new HiveContext(sc)
-//			import hiveContext.implicits._
-//			val df = rdd.map(x => (x._1,x._2,System.currentTimeMillis())).toDF("word", "count", "time")
-//		    df.write.saveAsTable("table_name") }
-//		)
-
-
-//		import java.util.{Date, Properties}
-//		val props = new Properties()
-//		props.put("bootstrap.servers", "10.141.208.49:9092,10.141.208.47:9092,10.141.208.45:9092")
-//		props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-//		props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-//		val producer = new KafkaProducer[String, String](props)
-//		wordcounts.foreachRDD(rdd => {
-//			  rdd.foreachPartition(partitionOfRecords => {
-//				  partitionOfRecords.foreach {
-//					  val data = new ProducerRecord[String, String]("outputTopic", "")
-//					  p.send(bytes)
-//				  }
-//			  }
+        scalaProgram += "sqlContext.sql(\"CREATE TABLE IF NOT EXISTS sparktest.groupby (`tid` bigint, `url` varchar(100), `count` int)\")\n";
+        scalaProgram += "val tid = System.currentTimeMillis() / 2000 * 2000\n";
+        scalaProgram += "result.map(x => (System.currentTimeMillis() / 2000 * 2000, x._1, x._2)).foreachRDD( rdd => {\n" +
+                "   val df = rdd.toDF(\"tid\", \"url\", \"count\")\n" +
+                "   df.write.insertInto(\"sparktest.groupby\")\n" +
+                "})\n";
 	}
 	
 	@Override
@@ -183,7 +134,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
     public String generate(String id) {
         return importPackages 
 //        		+ "ssc.checkpoint(\"hdfs://" + masterIP + ":9000/user/hadoop/checkpoint_" + id + "\")\n" //checkpoint must be a hdfs dir
-//				+ "ssc.checkpoint(\"hdfs://" + "10.141.208.43" + ":9000/user/hadoop/checkpoint_" + id + "\")\n" //checkpoint must be a hdfs dir
+				+ "ssc.checkpoint(\"hdfs://" + "10.141.208.43" + ":9000/user/hadoop/checkpoint_" + id + "\")\n" //checkpoint must be a hdfs dir
         		+ scalaProgram
         		+ "ssc.start() \n";
 //        		+ "ssc.awaitTerminationOrTimeout(1000*20) \n"
