@@ -15,8 +15,6 @@ import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,6 +30,7 @@ public class OperationParserService {
 		opTypeMap.put(Conf.DATASOURCE, OpType.DATASOURCE);
 		opTypeMap.put(Conf.FILTER, OpType.FILTER);
 		opTypeMap.put(Conf.WORDCOUNT, OpType.WORDCOUNT);
+		opTypeMap.put(Conf.GROUP_BY, OpType.GROUP_BY);
 		opTypeMap.put(Conf.WINDOWAGGREGATION, OpType.WINDOWAGGREGATION);
 		opTypeMap.put(Conf.TELECOM, OpType.TELECOM);
 		opTypeMap.put(Conf.OUTPUT, OpType.OUTPUT);
@@ -48,7 +47,7 @@ public class OperationParserService {
 	}
 
 	enum OpType {
-		DATASOURCE, FILTER, WORDCOUNT, WINDOWAGGREGATION, OUTPUT, TELECOM
+		DATASOURCE, FILTER, WORDCOUNT, WINDOWAGGREGATION, OUTPUT, TELECOM, GROUP_BY
 	}
 
 	private Operation parseOperation(JSONObject json) {
@@ -133,6 +132,7 @@ public class OperationParserService {
 			result = Filter.newInstance(obj);
 			break;
 		case WORDCOUNT:
+		case GROUP_BY:
 			result = WordCount.newInstance(obj);
 			break;
 		case WINDOWAGGREGATION:

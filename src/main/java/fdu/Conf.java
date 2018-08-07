@@ -13,5 +13,6 @@ public class Conf {
     public static final String WINDOWAGGREGATION = "stream-window-aggregation";
     public static final String OUTPUT = "output";
     public static final String TELECOM = "xingchang";
+    public static final String GROUP_BY = "stream-groupby";
     
 }
