@@ -1,8 +1,10 @@
 package fdu.bean.executor;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
 
 /**
  * Created by slade on 2016/11/28.
@@ -73,11 +75,9 @@ public class ShellExecutor {
 		p.destroy();
 	}
 
-	public String executeCommand(String command, String masterip, String masterport) throws IOException {
-		if (command.contains("xcxcxc")) {
-			String sparkSubmitCommand = sparkHome + "/bin/spark-submit xc_mysql.jar --master spark://" + masterip + ':' + masterport;
-			//System.out.println(sparkShellCommand);
-			p = Runtime.getRuntime().exec(sparkSubmitCommand);
+	public String executeCommand(String[] command, String masterip, String masterport) throws IOException {
+		if (masterip == null && masterport == null) {
+			p = Runtime.getRuntime().exec(command);
 		} else {
 			String sparkShellCommand = sparkHome + "/bin/spark-shell --master spark://" + masterip + ':' + masterport
 					+ " --packages org.apache.spark:spark-streaming-kafka-0-8_2.11:2.0.0" +
@@ -96,7 +96,7 @@ public class ShellExecutor {
 		error.start();
 
 		try {
-			writer.write(command);
+			writer.write(Arrays.stream(command).collect(Collectors.joining(" ")));
 //			Thread.sleep(1000*600);
 //			destroy();
 		} catch (InterruptedException e) {

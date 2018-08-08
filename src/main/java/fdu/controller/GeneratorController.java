@@ -29,17 +29,31 @@ public class GeneratorController {
 		scalaDriverGenerator.masterIP = masterip;
 		op.accept(scalaDriverGenerator);
 		String program = scalaDriverGenerator.generate(op.getId());
-		return shellExecutor.executeCommand(program, masterip, masterport);
+		return shellExecutor.executeCommand(new String[]{program}, masterip, masterport);
 	}
 
 	@RequestMapping(value = "/stopjob", method = RequestMethod.POST)
-    public String stopSparkJob() throws IOException {
+    public String stopSparkJob() throws IOException, InterruptedException {
         String[] cmd = {
                 "/bin/sh",
                 "-c",
                 "jps | grep SparkSubmit | cut -d ' ' -f1 | xargs kill -9"
         };
-        Runtime.getRuntime().exec(cmd);
+        shellExecutor.executeCommand(cmd, null, null);
+        // restart singer
+		String[] cmd2 = {
+				"/bin/sh",
+				"-c",
+				"jps -v | grep Singer | cut -d ' ' -f1 | xargs kill -9"
+		};
+		shellExecutor.executeCommand(cmd2, null, null);
+		Thread.sleep(1000);
+		String[] cmd3 = {
+                "/bin/sh",
+                "-c",
+                "java -jar -Dname=Singer /home/hadoop/wj/algo.picker.jar dlsfdsfh 9998 50"
+        };
+        shellExecutor.executeCommand(cmd3, null, null);
         return "ok";
     }
 }
