@@ -15,7 +15,9 @@ import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,7 +42,7 @@ public class OperationParserService {
 		return "{ \"infos\": " + conf + "}";
 	}
 
-	public Operation parse(String conf) {
+	public List<Operation> parse(String conf) {
 		System.out.println(confWrapper(conf));
 		JSONObject confJSON = new JSONObject(confWrapper(conf));
 		return parseOperation(confJSON);
@@ -50,14 +52,14 @@ public class OperationParserService {
 		DATASOURCE, FILTER, WORDCOUNT, WINDOWAGGREGATION, OUTPUT, TELECOM, GROUP_BY
 	}
 
-	private Operation parseOperation(JSONObject json) {
+	private List<Operation> parseOperation(JSONObject json) {
 		JSONArray infos = (JSONArray) json.get("infos");
 		Map<String, Operation> operations = convert2Operations(infos);
 		return constructOpTree(infos, operations);
 	}
 
-	private Operation constructOpTree(JSONArray infos, Map<String, Operation> operations) {
-		Operation root = null;
+	private List<Operation> constructOpTree(JSONArray infos, Map<String, Operation> operations) {
+		List<Operation> roots = new ArrayList<>();
 		for (Object obj : infos) {
 			if (!(obj instanceof JSONObject)) {
 				throw new AssertionError("converting fails: obj is of type " + obj.getClass().getName() + " instead of "
@@ -69,31 +71,32 @@ public class OperationParserService {
 			}
 			
 			if (isRoot((JSONObject) obj)) {
-				root = getOperationById(operations, (JSONObject) obj);
+				roots.add(getOperationById(operations, (JSONObject) obj));
 			} else {
-				Operation parent = operations
-						.get(((JSONObject) obj).getJSONArray("wires").getJSONArray(0).getString(0));
-				if (parent instanceof UnaryOperation) {
-					if (((UnaryOperation) parent).getLeft() != null) {
-						throw new AssertionError("Child already specified.");
-					} else {
-						((UnaryOperation) parent).setLeft(getOperationById(operations, (JSONObject) obj));
-					}
-				} else if (parent instanceof BinaryOperation) {
-					if (((BinaryOperation) parent).getLeft() != null && ((BinaryOperation) parent).getRight() != null) {
-						throw new AssertionError("Both children are specified");
-					}
+				((JSONObject) obj).getJSONArray("wires").getJSONArray(0).forEach(o -> {
+					Operation parent = operations.get(o);
+					if (parent instanceof UnaryOperation) {
+						if (((UnaryOperation) parent).getLeft() != null) {
+							throw new AssertionError("Child already specified.");
+						} else {
+							((UnaryOperation) parent).setLeft(getOperationById(operations, (JSONObject) obj));
+						}
+					} else if (parent instanceof BinaryOperation) {
+						if (((BinaryOperation) parent).getLeft() != null && ((BinaryOperation) parent).getRight() != null) {
+							throw new AssertionError("Both children are specified");
+						}
 
-					if (((BinaryOperation) parent).getLeft() == null) {
-						((BinaryOperation) parent).setLeft(getOperationById(operations, (JSONObject) obj));
-					} else {
-						((BinaryOperation) parent).setRight(getOperationById(operations, (JSONObject) obj));
+						if (((BinaryOperation) parent).getLeft() == null) {
+							((BinaryOperation) parent).setLeft(getOperationById(operations, (JSONObject) obj));
+						} else {
+							((BinaryOperation) parent).setRight(getOperationById(operations, (JSONObject) obj));
+						}
 					}
-				}
+				});
 			}
 		}
 
-		return root;
+		return roots;
 	}
 	
 	private Operation getOperationById(Map<String, Operation> operations, JSONObject obj) {

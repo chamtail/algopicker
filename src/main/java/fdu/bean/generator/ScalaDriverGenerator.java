@@ -23,18 +23,8 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 
 	@Override
     public void visitDataSource(DataSource source) {
-    	scalaProgram += "val lines = ssc.socketTextStream(\"localhost\", 9998)\n";
+//    	scalaProgram += "val lines = ssc.socketTextStream(\"localhost\", 9998)\n";
 //    	scalaProgram += "var urlHitsMap:Map[String, LongAdder] = Map()\n";
-		try {
-			if (source.getName().equals("xc")) {
-//				Runtime.getRuntime().exec("java -jar inputdata.jar");
-			} else {
-				Runtime.getRuntime().exec("./kafkaSource.sh test-topic " + source.getName() + ' ' + source.getFrequency());
-			}
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
     }
 
 	@Override
@@ -47,6 +37,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 
 	@Override
 	public void visitWordCount(WordCount wordCount) {
+        scalaProgram += "val lines = ssc.socketTextStream(\"localhost\", 9996)\n";
 		scalaProgram += "val tuple = lines.map(x => x.split(\" \"))\n";
 		scalaProgram += "val result = tuple.map(x => (x(2), 1L)).reduceByKeyAndWindow(_ + _, _ - _, Seconds(4), Seconds(2))\n";
         scalaProgram += "val sqlContext = new HiveContext(sc)\n";
@@ -66,6 +57,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 //				+ "val aggregation = numbersAndCount.reduceByWindow({(t1, t2) => (t1._1 + t2._1, t1._2 + t2._2, t1._1 max t2._1 max t1._3 max t2._3, t1._1 min t2._1 min t1._4 min t2._4)}, Seconds(2), Seconds(2)) \n";
 		switch (windowAggregation.getFunction()) {
 			case "sum": {
+                scalaProgram += "val lines = ssc.socketTextStream(\"localhost\", 9997)\n";
 			    scalaProgram += "val sqlContext = new HiveContext(sc)\n";
 			    scalaProgram += "sqlContext.sql(\"DROP TABLE IF EXISTS sparktest.aggregation\")\n";
 			    scalaProgram += "sqlContext.sql(\"CREATE TABLE IF NOT EXISTS sparktest.aggregation " +
