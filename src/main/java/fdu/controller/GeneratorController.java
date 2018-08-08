@@ -25,6 +25,13 @@ public class GeneratorController {
 	@RequestMapping(value = "/runjob", method = RequestMethod.POST)
 	public String generateDriver(String config, String masterip, String masterport,
 			ScalaDriverGenerator scalaDriverGenerator) throws IOException {
+	    // start singer
+        String[] cmd = {
+                "/bin/sh",
+                "-c",
+                "java -jar -Dname=Singer /home/hadoop/wj/algo.picker.jar dlsfdsfh 9998 50"
+        };
+        shellExecutor.executeCommand(cmd, null, null);
 		Operation op = operationParserService.parse(config);
 		scalaDriverGenerator.masterIP = masterip;
 		op.accept(scalaDriverGenerator);
@@ -40,20 +47,13 @@ public class GeneratorController {
                 "jps | grep SparkSubmit | cut -d ' ' -f1 | xargs kill -9"
         };
         shellExecutor.executeCommand(cmd, null, null);
-        // restart singer
+        // stop singer
 		String[] cmd2 = {
 				"/bin/sh",
 				"-c",
 				"jps -v | grep Singer | cut -d ' ' -f1 | xargs kill -9"
 		};
 		shellExecutor.executeCommand(cmd2, null, null);
-		Thread.sleep(1000);
-		String[] cmd3 = {
-                "/bin/sh",
-                "-c",
-                "java -jar -Dname=Singer /home/hadoop/wj/algo.picker.jar dlsfdsfh 9998 50"
-        };
-        shellExecutor.executeCommand(cmd3, null, null);
         return "ok";
     }
 }
