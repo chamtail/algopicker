@@ -71,7 +71,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 			    scalaProgram += "sqlContext.sql(\"CREATE TABLE IF NOT EXISTS sparktest.aggregation " +
                         "(`tid` bigint, `count` int)\")\n";
 			    scalaProgram += "lines.foreachRDD( rdd => {\n" +
-                        "   val time = System.currentTimeMillis() / 2000 * 2000\n" +
+                        "   val time = System.currentTimeMillis() / 2000 * 2\n" +
                         "   val count = rdd.count()\n" +
                         "   val df = rdd.map(x => (time, count)).toDF(\"tid\", \"count\")\n" +
                         "   df.limit(1).write.insertInto(\"sparktest.aggregation\")\n" +
