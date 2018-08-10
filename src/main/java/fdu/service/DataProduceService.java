@@ -3,7 +3,9 @@ package fdu.service;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -52,18 +54,20 @@ public class DataProduceService {
         controllers.submit(() -> {
             while (running) {
                 try {
-                    Thread.sleep(50L);
-                    int rowCount = urls.length;
-                    String line = String.format("%s %s %s", System.currentTimeMillis(), randomIp(),
-                            urls[new Random().nextInt(rowCount)]);
-                    portDataMap.values().forEach(queue -> {
-                        try {
-                            queue.put(line);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    });
-                } catch (InterruptedException e) {
+                    Socket controllerSocket = new Socket("localhost", 9998);
+                    BufferedReader in = new BufferedReader(new InputStreamReader(controllerSocket.getInputStream()));
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                        String finalLine = line;
+                        portDataMap.values().forEach(queue -> {
+                            try {
+                                queue.put(finalLine);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        });
+                    }
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
