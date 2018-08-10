@@ -41,6 +41,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 		scalaProgram += "val tuple = lines.map(x => x.split(\" \"))\n";
 		scalaProgram += "val result = tuple.map(x => (x(2), 1L)).reduceByKeyAndWindow(_ + _, _ - _, Seconds(4), Seconds(2))\n";
         scalaProgram += "val sqlContext = new HiveContext(sc)\n";
+		scalaProgram += "sqlContext.sql(\"CREATE DATABASE IF NOT EXISTS sparktest\")\n";
         scalaProgram += "sqlContext.sql(\"DROP TABLE IF EXISTS sparktest.groupby\")\n";
         scalaProgram += "sqlContext.sql(\"CREATE TABLE IF NOT EXISTS sparktest.groupby (`tid` bigint, `url` varchar(100), `count` int)\")\n";
         scalaProgram += "val tid = System.currentTimeMillis() / 2000 * 2000\n";
@@ -59,6 +60,7 @@ public class ScalaDriverGenerator implements OperatorVisitor {
 			case "sum": {
                 scalaProgram += "val lines = ssc.socketTextStream(\"localhost\", 9997)\n";
 			    scalaProgram += "val sqlContext = new HiveContext(sc)\n";
+				scalaProgram += "sqlContext.sql(\"CREATE DATABASE IF NOT EXISTS sparktest\")\n";
 			    scalaProgram += "sqlContext.sql(\"DROP TABLE IF EXISTS sparktest.aggregation\")\n";
 			    scalaProgram += "sqlContext.sql(\"CREATE TABLE IF NOT EXISTS sparktest.aggregation " +
                         "(`tid` bigint, `count` int)\")\n";
